@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spin for Riches</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            background: radial-gradient(ellipse at center, #7a9dff 0%, #3a5fae 100%);
+        }
+        .luckiest-guy {
+            font-family: 'Luckiest Guy', cursive;
+        }
+        #wheel-container {
+            position: relative;
+            width: 90vw;
+            height: 90vw;
+            max-width: 500px;
+            max-height: 500px;
+            filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.5));
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+        #pointer {
+            position: absolute;
+            left: 50%;
+            top: -15px;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 30px solid transparent;
+            border-right: 30px solid transparent;
+            border-top: 50px solid #e74c3c;
+            z-index: 10;
+            transition: transform 0.2s ease-out;
+            filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.5));
+        }
+        .spin-button {
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+        .spin-button:active {
+            transform: scale(0.95) !important; /* Override animation */
+        }
+        .spin-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            animation: none;
+        }
+        #modal {
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+        #modal.hidden {
+            opacity: 0;
+            transform: scale(0.9);
+            pointer-events: none;
+        }
+
+        /* Flashy Animations */
+        @keyframes flashy {
+            0%, 100% { text-shadow: 2px 2px 0 #c0392b, 4px 4px 0 #8e2b20, 0 0 10px #fff, 0 0 20px #ffc, 0 0 30px #ff0; }
+            50% { text-shadow: 2px 2px 0 #c0392b, 4px 4px 0 #8e2b20, 0 0 15px #fff, 0 0 25px #ffc, 0 0 40px #ff0; }
+        }
+        .flashy-title {
+            animation: flashy 2.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+            50% { transform: scale(1.05); box-shadow: 0 15px 30px rgba(0,0,0,0.3); }
+            100% { transform: scale(1); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+        }
+        .spin-button:not(:disabled) {
+            animation: pulse 2s infinite;
+        }
+        
+        /* Confetti */
+        #modal-content {
+            position: relative;
+        }
+        .confetti-piece {
+            position: absolute;
+            width: 10px;
+            height: 20px;
+            top: -50px; /* Start above the modal */
+            opacity: 0;
+            animation: fall 5s linear forwards;
+        }
+        @keyframes fall {
+            0% {
+                transform: translateY(0) rotateZ(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(400px) rotateZ(720deg);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4 text-white">
+
+    <div class="text-center mb-4 md:mb-8">
+        <h1 class="text-4xl md:text-6xl text-yellow-400 luckiest-guy tracking-wider flashy-title">Spin for Riches!</h1>
+        <p class="text-lg md:text-2xl mt-2 font-semibold" style="text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">What are you spinning for today?</p>
+        <div id="goal-container" class="bg-white/20 backdrop-blur-sm rounded-lg p-3 mt-4 shadow-lg min-h-[60px] flex items-center justify-center border border-white/30">
+            <h2 id="spending-goal" class="text-xl md:text-2xl text-center font-bold"></h2>
+        </div>
+    </div>
+
+    <div id="wheel-container" class="my-4">
+        <div id="pointer"></div>
+        <canvas id="wheel-canvas"></canvas>
+    </div>
+
+    <button id="spin-button" class="spin-button luckiest-guy text-4xl text-white bg-green-500 border-b-8 border-green-700 rounded-full px-16 py-6 shadow-2xl hover:bg-green-600 focus:outline-none disabled:bg-gray-400 disabled:border-gray-500">
+        SPIN!
+    </button>
+
+    <!-- Result Modal -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50">
+        <div id="modal-content" class="bg-white rounded-2xl shadow-2xl p-6 md:p-10 text-center max-w-lg w-full transform transition-transform duration-300 ease-out">
+            <div id="confetti-container" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+            <h3 id="modal-title" class="text-3xl md:text-5xl luckiest-guy text-yellow-500" style="text-shadow: 1px 1px 0 #c0392b, 2px 2px 0 #8e2b20;">Congratulations!</h3>
+            <p id="modal-text" class="text-lg md:text-2xl text-gray-700 my-6"></p>
+            <button id="close-modal-btn" class="luckiest-guy text-2xl text-white bg-blue-500 border-b-4 border-blue-700 rounded-lg px-8 py-3 hover:bg-blue-600 focus:outline-none">
+                Spin Again
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('wheel-canvas');
+        const ctx = canvas.getContext('2d');
+        const spinButton = document.getElementById('spin-button');
+        const spendingGoalEl = document.getElementById('spending-goal');
+        const modal = document.getElementById('modal');
+        const modalText = document.getElementById('modal-text');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const pointer = document.getElementById('pointer');
+
+        let segments = [];
+        const spendingGoals = [
+            { id: "Holiday", text: "A spectacular <strong>Holiday</strong>", min: 500, max: 500000 },
+            { id: "Car", text: "A brand new <strong>Car</strong>", min: 2000, max: 1000000 },
+            { id: "Anything", text: "<strong>Whatever you want!</strong>", min: 10, max: 100000000 },
+            { id: "Dining", text: "A day of fine <strong>Food & Dining</strong>", min: 50, max: 10000 },
+            { id: "Charity", text: "Money for <strong>Anyone but you</strong>", min: 50, max: 5000000 },
+            { id: "Business", text: "An investment in a <strong>Business</strong>", min: 100000, max: 10000000 },
+            { id: "Hobbies", text: "Funding for your <strong>Hobbies</strong>", min: 500, max: 500000 },
+        ];
+        
+        const colors = ['#f1c40f', '#ffffff']; // Yellow and White
+        const numSegments = 20;
+        const arcSize = (2 * Math.PI) / numSegments;
+        let currentRotation = 0;
+        let spinAngleStart = 0;
+        let spinTime = 0;
+        let spinTimeTotal = 0;
+        let isSpinning = false;
+        let currentGoal = {};
+
+        // --- Drawing Functions ---
+        function formatMoney(n) {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n);
+        }
+        
+        function formatLabel(num) {
+            if (num >= 1000000000) return '$' + (num / 1000000000).toFixed(1) + 'B';
+            if (num >= 1000000) return '$' + (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return '$' + (num / 1000).toFixed(0) + 'K';
+            return '$' + num;
+        }
+
+        function drawSegment(key) {
+            if (!segments[key]) return;
+            const startAngle = key * arcSize;
+            const endAngle = (key + 1) * arcSize;
+            
+            ctx.fillStyle = colors[key % 2];
+            ctx.beginPath();
+            // All segments are drawn in their "static" positions
+            ctx.arc(250, 250, 250, startAngle, endAngle, false);
+            ctx.arc(250, 250, 30, endAngle, startAngle, true);
+            ctx.fill();
+
+            // Draw text
+            ctx.save();
+            ctx.fillStyle = '#333';
+            const textAngle = startAngle + arcSize / 2;
+            ctx.translate(250, 250);
+            ctx.rotate(textAngle);
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // Position text in the middle of the segment's radial length
+            // Outer radius 250, inner radius 30. Middle is (250+30)/2 = 140
+            ctx.fillText(segments[key].label, 140, 0);
+            ctx.restore();
+        }
+
+        function drawWheel() {
+            ctx.clearRect(0, 0, 500, 500);
+            ctx.save();
+            
+            // Translate to center and rotate the entire canvas
+            ctx.translate(250, 250);
+            ctx.rotate(currentRotation);
+            ctx.translate(-250, -250);
+            
+            // Draw all segments in their static positions
+            for (let i = 0; i < numSegments; i++) {
+                drawSegment(i);
+            }
+            
+            ctx.restore();
+        }
+        
+        function setCanvasSize() {
+            const size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.45, 500);
+            const container = document.getElementById('wheel-container');
+            container.style.width = `${size}px`;
+            container.style.height = `${size}px`;
+            canvas.width = 500;
+            canvas.height = 500;
+            drawWheel();
+        }
+
+        // --- Game Logic ---
+        function generateSegments(goal) {
+            const newSegments = [];
+            const { min, max } = goal;
+            for (let i = 0; i < numSegments; i++) {
+                let value = Math.random() * (max - min) + min;
+
+                // Make numbers rounder and more readable
+                if (value > 1000000) {
+                    value = Math.round(value / 100000) * 100000;
+                } else if (value > 10000) {
+                    value = Math.round(value / 1000) * 1000;
+                } else if (value > 1000) {
+                    value = Math.round(value / 100) * 100;
+                } else {
+                    value = Math.round(value / 10) * 10;
+                }
+                
+                newSegments.push({ value, label: formatLabel(value) });
+            }
+            newSegments.sort((a, b) => a.value - b.value);
+            segments = newSegments;
+        }
+
+        function setNextGoal() {
+             currentGoal = spendingGoals[Math.floor(Math.random() * spendingGoals.length)];
+             spendingGoalEl.innerHTML = currentGoal.text;
+             generateSegments(currentGoal);
+             drawWheel();
+        }
+
+        function rotateWheel() {
+            spinTime += 30;
+            if (spinTime >= spinTimeTotal) {
+                stopRotateWheel();
+                return;
+            }
+            const spinAngle = spinAngleStart - easeOut(spinTime, 0, spinAngleStart, spinTimeTotal);
+            currentRotation += (spinAngle * Math.PI / 180);
+            
+            const segmentsPassed = Math.floor((currentRotation - Math.floor(currentRotation / (2 * Math.PI)) * (2 * Math.PI)) / arcSize);
+            if (segmentsPassed !== window.lastSegment) {
+                window.lastSegment = segmentsPassed;
+                pointer.style.transform = 'translateX(-50%) rotate(10deg)';
+                setTimeout(() => pointer.style.transform = 'translateX(-50%) rotate(0deg)', 100);
+            }
+
+            drawWheel();
+            requestAnimationFrame(rotateWheel);
+        }
+
+        function stopRotateWheel() {
+            isSpinning = false;
+            spinButton.disabled = false;
+            
+            const degrees = currentRotation * 180 / Math.PI;
+            const arcd = arcSize * 180 / Math.PI;
+
+            // The pointer is at the top (270 degrees). We need to find which segment angle is now at 270 degrees.
+            // The angle of the segment is calculated by reversing the rotation.
+            const effectiveRotation = (degrees % 360 + 360) % 360;
+            const winningAngle = (270 - effectiveRotation + 360) % 360;
+            
+            // The index is which segment `winningAngle` falls into.
+            const index = Math.floor(winningAngle / arcd);
+            
+            const winningSegment = segments[index];
+            showResult(winningSegment);
+        }
+
+        function easeOut(t, b, c, d) {
+            // easeOutQuint
+            t = t / d - 1;
+            return c * (t * t * t * t * t + 1) + b;
+        }
+
+        function spin() {
+            if (isSpinning) return;
+            isSpinning = true;
+            spinButton.disabled = true;
+            
+            // REMOVED setNextGoal() from here to lock in the current goal for the spin.
+
+            spinAngleStart = Math.random() * 3 + 5; // Slower, more natural spin
+            spinTime = 0;
+            spinTimeTotal = Math.random() * 9000 + 30000; // Tripled spin duration for maximum drama
+            
+            window.lastSegment = -1;
+            rotateWheel();
+        }
+        
+        function launchConfetti() {
+            const container = document.getElementById('confetti-container');
+            container.innerHTML = '';
+            const confettiColors = ['#f1c40f', '#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#1abc9c'];
+            for (let i = 0; i < 150; i++) {
+                const piece = document.createElement('div');
+                piece.classList.add('confetti-piece');
+                piece.style.left = `${Math.random() * 100}%`;
+                piece.style.backgroundColor = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+                piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+                piece.style.animationDelay = `${Math.random() * 4}s`;
+                piece.style.animationDuration = `${2 + Math.random() * 3}s`;
+                container.appendChild(piece);
+            }
+        }
+
+        function showResult(segment) {
+            let spendingText = `You won <strong>${formatMoney(segment.value)}</strong> for your <strong>${currentGoal.id}</strong>!`;
+            
+            modalText.innerHTML = spendingText;
+            modal.classList.remove('hidden');
+            launchConfetti();
+        }
+        
+        // --- Event Listeners ---
+        spinButton.addEventListener('click', spin);
+
+        closeModalBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            setNextGoal();
+        });
+        
+        window.addEventListener('resize', setCanvasSize);
+
+        // --- Initialization ---
+        function init() {
+            setCanvasSize();
+            setNextGoal();
+        }
+
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
+
+
+
+
+
